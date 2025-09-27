@@ -1,0 +1,80 @@
+# ------------------------
+# Python
+# ------------------------
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pyc
+*.sqlite3
+*.db
+
+# Virtual environment
+.venv/
+env/
+venv/
+ENV/
+
+# Coverage / Test
+.coverage
+htmlcov/
+.tox/
+.mypy_cache/
+.pytest_cache/
+.cache/
+
+# ------------------------
+# IDEs / Editores
+# ------------------------
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+*.swp
+*.swo
+
+# ------------------------
+# Env / Configs
+# ------------------------
+.env
+.env.local
+.env.*.local
+
+# ------------------------
+# Logs
+# ------------------------
+*.log
+logs/
+*.pid
+
+# ------------------------
+# Docker
+# ------------------------
+*.pid
+*.sock
+docker-compose.override.yml
+/.docker/
+
+# ------------------------
+# Cache / Build
+# ------------------------
+*.egg-info/
+dist/
+build/
+*.egg
+*.lock
+*.tmp
+
+# ------------------------
+# MacOS / Windows
+# ------------------------
+.DS_Store
+Thumbs.db
+
+# ------------------------
+# Node / Frontend (caso use npm ou yarn futuramente)
+# ------------------------
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
