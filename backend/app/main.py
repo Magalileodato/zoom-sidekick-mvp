@@ -7,6 +7,7 @@ Responsável por:
 - Configurar middlewares (CORS)
 - Capturar erros globais
 - Endpoints de health check
+- Startup logging
 """
 
 # ------------------------
@@ -23,6 +24,7 @@ from fastapi.responses import JSONResponse
 # Locais
 from app import routes
 from app.utils.logger import logger
+from app.utils import config  # ✅ Variáveis de ambiente centralizadas
 
 # ------------------------
 # Criação da aplicação FastAPI
@@ -37,9 +39,10 @@ app = FastAPI(
 # Middleware CORS
 # ------------------------
 # Em produção, substituir '*' pelos domínios confiáveis
+allowed_origins = ["*"] if config.ENVIRONMENT == "development" else config.ALLOWED_ORIGINS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -54,10 +57,7 @@ async def global_exception_handler(request: Request, exc: Exception):
     Captura qualquer exceção não tratada nos endpoints
     e retorna resposta padrão com status 500.
     """
-    # Log detalhado do erro e traceback para debug
     logger.error(f"Erro inesperado: {exc}\n{traceback.format_exc()}")
-    
-    # Resposta para o usuário/cliente
     return JSONResponse(
         status_code=500,
         content={"detail": "Ocorreu um erro interno. Contate o administrador."},
@@ -73,10 +73,6 @@ app.include_router(routes.router)
 # ------------------------
 @app.get("/", tags=["Health"], summary="Verifica se a API está rodando")
 async def read_root():
-    """
-    Endpoint raiz de verificação do status da API.
-    Pode ser usado para monitoramento básico.
-    """
     logger.info("Health check raiz solicitado")
     return {"status": "Zoom Sidekick API is running 🚀"}
 
@@ -85,9 +81,17 @@ async def read_root():
 # ------------------------
 @app.get("/health", tags=["Health"], summary="Health check detalhado")
 async def health_check():
-    """
-    Retorna informações de status da aplicação
-    para monitoramento de serviços e containers.
-    """
     logger.info("Health check detalhado solicitado")
-    return {"status": "ok", "message": "API is running"}
+    return {
+        "status": "ok",
+        "message": "API is running",
+        "env": config.ENVIRONMENT,
+        "debug": config.DEBUG,
+    }
+
+# ------------------------
+# Evento de startup
+# ------------------------
+@app.on_event("startup")
+async def startup_event():
+    logger.info(f"Zoom Sidekick API iniciada em modo {config.ENVIRONMENT}. Debug: {config.DEBUG}")
