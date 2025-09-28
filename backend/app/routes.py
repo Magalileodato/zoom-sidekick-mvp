@@ -1,20 +1,10 @@
-"""
-Routes - Definição dos endpoints da API
----------------------------------------
-Este arquivo define as rotas do FastAPI, utilizando os serviços do bot
-para conduzir a entrevista e serviços auxiliares (STT, TTS, Summary).
-Inclui:
-- Logging
-- Validação de arquivos
-- Tratamento de erros
-- Endpoint de saúde
-"""
-
 from fastapi import APIRouter, UploadFile, File, HTTPException, status
 from fastapi.responses import FileResponse
 from pathlib import Path
 from app.services.bot_service import InterviewBot
 from app.utils.logger import logger
+from pydub import AudioSegment  # <- para conversão webm → wav
+import tempfile
 
 # Inicializa o bot (perguntas padrão)
 bot = InterviewBot()
@@ -29,25 +19,15 @@ TMP_DIR.mkdir(parents=True, exist_ok=True)
 # Define tamanho máximo de arquivo de áudio (5MB)
 MAX_FILE_SIZE = 5 * 1024 * 1024
 
-# ------------------------
-# Endpoints
-# ------------------------
 
 @router.get("/health", tags=["Health"], summary="Verifica se a API está rodando")
 async def health_check():
-    """
-    Endpoint de saúde da API.
-    Retorna status HTTP 200 OK com mensagem.
-    """
     logger.info("Health check solicitado")
     return {"status": "ok", "message": "API is running"}
 
 
 @router.get("/next_question", tags=["Interview"], summary="Retorna a próxima pergunta do bot")
 def get_next_question():
-    """
-    Retorna a próxima pergunta em texto e o estado da entrevista.
-    """
     question = bot.get_next_question()
     logger.info(f"Próxima pergunta: {question}")
     return {
@@ -59,20 +39,14 @@ def get_next_question():
 
 @router.post("/answer", tags=["Interview"], summary="Envia a resposta do usuário")
 async def answer_question(audio: UploadFile = File(...)):
-    """
-    Recebe arquivo de áudio do usuário e retorna:
-    - transcrição (STT)
-    - resumo (GPT)
-    - caminho do áudio da próxima pergunta (TTS)
-    """
-    logger.info(f"Recebido arquivo de áudio: {audio.filename}")
+    logger.info(f"Recebido arquivo de áudio: {audio.filename} ({audio.content_type})")
 
     # Valida tipo de arquivo
-    if audio.content_type not in ["audio/wav", "audio/mpeg", "audio/mp3"]:
+    if audio.content_type not in ["audio/wav", "audio/mpeg", "audio/mp3", "audio/webm"]:
         logger.warning(f"Tipo de arquivo inválido: {audio.content_type}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Tipo de arquivo não suportado"
+            detail=f"Tipo de arquivo não suportado: {audio.content_type}"
         )
 
     # Valida tamanho do arquivo
@@ -84,9 +58,25 @@ async def answer_question(audio: UploadFile = File(...)):
         )
 
     try:
-        # Processa a resposta via bot
-        result = bot.process_response(audio.file)
+        # Se for WEBM → converter para WAV antes de processar
+        if audio.content_type == "audio/webm":
+            logger.info("Convertendo arquivo WEBM para WAV...")
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".webm") as tmp_webm:
+                tmp_webm.write(await audio.read())
+                tmp_webm.flush()
+                wav_path = tmp_webm.name.replace(".webm", ".wav")
+
+                AudioSegment.from_file(tmp_webm.name, format="webm").export(wav_path, format="wav")
+
+            with open(wav_path, "rb") as f:
+                result = bot.process_response(f)
+
+        else:
+            # Para arquivos já em WAV/MP3
+            result = bot.process_response(audio.file)
+
         logger.info("Áudio processado com sucesso")
+
     except Exception as e:
         logger.error(f"Erro ao processar áudio: {str(e)}")
         raise HTTPException(
@@ -103,9 +93,6 @@ async def answer_question(audio: UploadFile = File(...)):
 
 @router.get("/play_audio/{audio_filename}", tags=["Interview"], summary="Baixa ou reproduz um áudio gerado")
 def play_audio(audio_filename: str):
-    """
-    Endpoint para baixar ou reproduzir arquivo de áudio gerado.
-    """
     audio_path = TMP_DIR / audio_filename
 
     if not audio_path.exists():

@@ -14,9 +14,11 @@ import logging
 # Configuração do logger para este módulo
 logger = logging.getLogger(__name__)
 
-# Pasta temporária para salvar áudios gerados
+# Diretório temporário para salvar arquivos de áudio gerados
 TMP_AUDIO_DIR = "tmp"
-os.makedirs(TMP_AUDIO_DIR, exist_ok=True)
+if not os.path.exists(TMP_AUDIO_DIR):
+    os.makedirs(TMP_AUDIO_DIR)
+    logger.info(f"Pasta temporária criada em: {TMP_AUDIO_DIR}")
 
 def generate_audio(text: str, lang: str = "pt") -> str:
     """
@@ -39,11 +41,11 @@ def generate_audio(text: str, lang: str = "pt") -> str:
         filename = f"speech_{uuid.uuid4()}.mp3"
         filepath = os.path.join(TMP_AUDIO_DIR, filename)
 
-        # Cria o objeto gTTS
+        # Cria o objeto gTTS e salva o arquivo
         tts = gTTS(text=text, lang=lang)
-        tts.save(filepath)  # Salva o arquivo
+        tts.save(filepath)
 
-        logger.info(f"Áudio gerado com sucesso: {filepath}")
+        logger.info(f"Áudio TTS gerado com sucesso: {filepath}")
         return filepath
 
     except Exception as e:

@@ -1,45 +1,40 @@
 """
 main.py - Ponto de entrada da aplicação FastAPI
 ------------------------------------------------
-Responsável por:
-- Iniciar a API
-- Registrar rotas
-- Configurar middlewares (CORS)
-- Capturar erros globais
-- Endpoints de health check
-- Startup logging
+- Inicializa a API e middlewares
+- Registra rotas
+- Configura handlers globais de erro
+- Serve frontend estático
 """
 
-# ------------------------
-# Imports
-# ------------------------
-# Padrões
 import traceback
-
-# FastAPI
-from fastapi import FastAPI, Request
+from pathlib import Path
+from fastapi import FastAPI, Request, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
+from uuid import uuid4
+import shutil
 
-# Locais
-from app import routes
 from app.utils.logger import logger
-from app.utils import config  # ✅ Variáveis de ambiente centralizadas
+from app.utils import config
+from app.services import stt_service, tts_service, summary_service
 
 # ------------------------
-# Criação da aplicação FastAPI
+# Criação da aplicação
 # ------------------------
 app = FastAPI(
     title="Zoom Sidekick MVP",
-    description="MVP de assistente de entrevistas em reuniões online",
+    description="Assistente de entrevistas em reuniões online",
     version="1.0.0",
 )
 
 # ------------------------
 # Middleware CORS
 # ------------------------
-# Em produção, substituir '*' pelos domínios confiáveis
-allowed_origins = ["*"] if config.ENVIRONMENT == "development" else config.ALLOWED_ORIGINS
+allowed_origins = (
+    ["*"] if config.ENVIRONMENT == "development" else (config.ALLOWED_ORIGINS or [])
+)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
@@ -49,49 +44,121 @@ app.add_middleware(
 )
 
 # ------------------------
-# Middleware de tratamento global de exceções
+# Middleware: handler global de exceções
 # ------------------------
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
-    """
-    Captura qualquer exceção não tratada nos endpoints
-    e retorna resposta padrão com status 500.
-    """
-    logger.error(f"Erro inesperado: {exc}\n{traceback.format_exc()}")
+    logger.error(
+        f"[Unhandled Exception] Path: {request.url.path} | Error: {exc}\n"
+        f"{traceback.format_exc()}"
+    )
     return JSONResponse(
         status_code=500,
-        content={"detail": "Ocorreu um erro interno. Contate o administrador."},
+        content={"detail": "Erro interno. Contate o administrador."},
     )
 
 # ------------------------
-# Registro de rotas
+# Endpoints de Health
 # ------------------------
-app.include_router(routes.router)
-
-# ------------------------
-# Endpoint raiz (async para consistência)
-# ------------------------
-@app.get("/", tags=["Health"], summary="Verifica se a API está rodando")
+@app.get("/api", tags=["Health"])
 async def read_root():
     logger.info("Health check raiz solicitado")
     return {"status": "Zoom Sidekick API is running 🚀"}
 
-# ------------------------
-# Endpoint health detalhado
-# ------------------------
-@app.get("/health", tags=["Health"], summary="Health check detalhado")
+@app.get("/api/health", tags=["Health"])
 async def health_check():
     logger.info("Health check detalhado solicitado")
     return {
         "status": "ok",
-        "message": "API is running",
         "env": config.ENVIRONMENT,
         "debug": config.DEBUG,
     }
 
 # ------------------------
-# Evento de startup
+# Endpoint /answer - Recebe áudio e processa
 # ------------------------
-@app.on_event("startup")
-async def startup_event():
-    logger.info(f"Zoom Sidekick API iniciada em modo {config.ENVIRONMENT}. Debug: {config.DEBUG}")
+@app.post("/answer")
+async def answer(audio: UploadFile = File(...)):
+    """
+    Recebe o áudio enviado pelo frontend, processa:
+    1. Converte para WAV
+    2. Transcreve (STT)
+    3. Resume (GPT)
+    4. Retorna JSON com transcrição, resumo e arquivo de áudio da próxima pergunta
+    """
+    try:
+        # ------------------------
+        # Pastas temporárias
+        # ------------------------
+        tmp_dir = Path("tmp")
+        audio_dir = tmp_dir / "audio"
+        audio_dir.mkdir(parents=True, exist_ok=True)
+
+        # ------------------------
+        # Salvar arquivo enviado
+        # ------------------------
+        original_ext = Path(audio.filename).suffix
+        input_path = audio_dir / f"input_{uuid4().hex}{original_ext}"
+        with open(input_path, "wb") as f:
+            shutil.copyfileobj(audio.file, f)
+
+        # ------------------------
+        # Converter para WAV
+        # ------------------------
+        from app.utils.config_ffmpeg import AudioSegment
+        wav_filename = f"response_{uuid4().hex}.wav"
+        wav_path = audio_dir / wav_filename
+
+        sound = AudioSegment.from_file(input_path)
+        sound.export(wav_path, format="wav")
+
+        # ------------------------
+        # Processamento STT e Summary
+        # ------------------------
+        transcription = stt_service.transcribe(str(wav_path))
+        summary = summary_service.summarize(transcription)
+
+        # ------------------------
+        # Próxima pergunta TTS
+        # ------------------------
+        next_question_text = "Qual sua experiência anterior?"
+        next_audio_filename = f"question_{uuid4().hex}.wav"
+        next_audio_path = audio_dir / next_audio_filename
+        tts_service.generate_audio(next_question_text, str(next_audio_path))
+
+        # ------------------------
+        # Retornar JSON
+        # ------------------------
+        return {
+            "transcription": transcription,
+            "summary": summary,
+            "next_question_audio": next_audio_filename
+        }
+
+    except Exception as e:
+        logger.error(f"Erro ao processar /answer: {e}")
+        return JSONResponse(
+            status_code=500,
+            content={"detail": "Erro ao processar áudio."}
+        )
+
+# ------------------------
+# Endpoint para servir áudio da próxima pergunta
+# ------------------------
+@app.get("/play_audio/{filename}")
+async def play_audio(filename: str):
+    file_path = Path("tmp") / "audio" / filename
+    if file_path.exists():
+        return FileResponse(file_path, media_type="audio/wav")
+    return JSONResponse(status_code=404, content={"detail": "Arquivo de áudio não encontrado"})
+
+# ------------------------
+# Servir frontend estático
+# ------------------------
+BASE_DIR = Path(__file__).resolve().parent
+PROJECT_DIR = BASE_DIR.parent
+FRONTEND_DIR = PROJECT_DIR / "frontend"
+
+if FRONTEND_DIR.exists():
+    app.mount("/", StaticFiles(directory=str(FRONTEND_DIR), html=True), name="frontend")
+    logger.info(f"Frontend montado em: {FRONTEND_DIR}")
