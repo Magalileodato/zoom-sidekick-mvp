@@ -1,32 +1,36 @@
 # ------------------------
 # Backend
 # ------------------------
-fastapi==0.103.2            # Framework principal da API
-uvicorn[standard]==0.23.2   # Servidor ASGI rápido para FastAPI
-pydantic==2.5.1             # Validação e parsing de dados
+fastapi==0.103.2
+uvicorn[standard]==0.23.2
+pydantic==2.5.1
+python-multipart       # Necessário para receber Form e UploadFile no FastAPI
 
 # ------------------------
 # OpenAI / Inteligência Artificial
 # ------------------------
-openai==1.32.0              # Integração com GPT
-whisper==1.1.10             # Transcrição de áudio (STT)
-torch==2.3.1                # Dependência do Whisper para processamento de modelos (CPU/Windows)
+openai==1.32.0
+whisper==1.1.10       # Pacote oficial do Whisper
+torch==2.8.0+cpu      # CPU-only para Windows
+torchaudio==2.8.0+cpu # Compatível com torch CPU
+torchvision==0.23.0+cpu
 
 # ------------------------
 # Text-to-Speech (TTS)
 # ------------------------
-gTTS==2.3.2                 # Conversão de texto em áudio (TTS)
+gTTS==2.3.2
 
 # ------------------------
 # Manipulação de Áudio
 # ------------------------
-pydub==0.25.1               # Conversão e manipulação de arquivos de áudio
-ffmpeg-python==0.2.0        # Backend para processamento de áudio com FFmpeg
-soundfile==0.12.1           # Leitura/escrita de arquivos WAV
+pydub==0.25.1
+ffmpeg-python==0.2.0
+soundfile==0.12.1
+pyaudio
 
 # ------------------------
 # Utilitários
 # ------------------------
-python-dotenv==1.0.1        # Carregar variáveis de ambiente de arquivos .env
-loguru==0.7.0               # Logging avançado para debug e produção
-requests==2.31.0            # Chamadas HTTP externas
+python-dotenv==1.0.1
+loguru==0.7.0
+requests==2.31.0
