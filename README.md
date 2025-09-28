@@ -63,6 +63,83 @@ zoom-sidekick-mvp/
 | Frontend 🌐 | HTML5, CSS3, JS         | Captura áudio e interação com o usuário |
 | Deploy 🐳   | Docker & Docker Compose | Containerização                         |
 
+## Instalação de Dependências
+
+O projeto tem suporte a Windows e Linux/Mac.
+Escolha o arquivo de requirements correspondente ao seu sistema:
+
+Windows (CPU only)
+
+Instalação:
+
+pip install -r requirements-windows.txt
+
+
+Exemplo de requirements-windows.txt:
+
+# Backend
+fastapi==0.103.2
+uvicorn[standard]==0.23.2
+pydantic==2.5.1
+
+# OpenAI / IA
+openai==1.32.0
+whisper==1.1.10
+torch==2.3.1         # CPU / Windows
+
+# TTS
+gTTS==2.3.2
+
+# Manipulação de áudio
+pydub==0.25.1
+ffmpeg-python==0.2.0
+soundfile==0.12.1
+
+# Utilitários
+python-dotenv==1.0.1
+loguru==0.7.0
+requests==2.31.0
+
+Linux / WSL / Mac
+
+Instalação:
+
+pip install -r requirements-linux.txt
+
+
+Exemplo de requirements-linux.txt:
+
+# Backend
+fastapi==0.103.2
+uvicorn[standard]==0.23.2
+pydantic==2.5.1
+
+# OpenAI / IA
+openai==1.32.0
+whisper==1.1.10
+torch==2.3.1         # Linux/Mac (CPU por padrão)
+# Para suporte CUDA/GPU, consulte a documentação do PyTorch
+
+# TTS
+gTTS==2.3.2
+
+# Manipulação de áudio
+pydub==0.25.1
+ffmpeg-python==0.2.0
+soundfile==0.12.1
+
+# Utilitários
+python-dotenv==1.0.1
+loguru==0.7.0
+requests==2.31.0
+
+
+⚠️ Observação:
+
+No Windows, a versão usada do torch é apenas para CPU.
+
+No Linux/Mac você pode instalar suporte a GPU caso tenha CUDA disponível.
+
 
 ## 📈 Fluxo da Entrevista
 
